@@ -9,9 +9,8 @@ Dos clases, declaradas como anotaciones en la entidad usada:
     ``TRUNCATE``, ``COPY``, ``USING``, ``REFERENCES``, ``GRANT … ON``,
     ``db_table =``, ``__tablename__ =``, ``Table("…")``; los esquemas también
     en ``ON SCHEMA``, ``CREATE SCHEMA`` y ``search_path``, incluso
-    ``-csearch_path=…``), así que ``base_url``, ``from base_utils import x``,
-    ``import x from "base_y"`` o el ``FROM imagen`` de un Dockerfile no son
-    evidencia.
+    ``-csearch_path=…``), así que ``pedidos_url``, los ``import`` de Python o
+    de JavaScript y el ``FROM imagen`` de un Dockerfile no son evidencia.
 
 ``py-backstage/huellas``
     Expresiones regulares de Python, una por línea (hosts, nombres de
