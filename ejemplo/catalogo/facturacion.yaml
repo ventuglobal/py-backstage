@@ -1,0 +1,36 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: facturador
+  title: Facturador
+  description: Emite documentos tributarios a partir de los pedidos
+  annotations:
+    github.com/project-slug: ejemplo/facturador
+spec:
+  type: service
+  lifecycle: production
+  owner: group:plataforma
+  system: facturacion
+  providesApis: [facturas-http]
+  consumesApis: [pedidos-sql]
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: facturas-http
+  title: API de facturas
+  description: Emisión y consulta de documentos por HTTP
+  annotations:
+    py-backstage/huellas: FACTURADOR_URL
+    py-backstage/variables: |
+      FACTURADOR_URL=http://facturador.interno:8000
+      FACTURADOR_TOKEN=
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:plataforma
+  system: facturacion
+  definition: |
+    openapi: 3.1.0
+    info: {title: Facturas, version: "1"}
+    paths: {}

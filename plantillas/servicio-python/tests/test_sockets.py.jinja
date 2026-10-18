@@ -1,0 +1,26 @@
+import socket
+
+import pytest
+
+from [[ paquete ]].main import sockets_de_escucha
+
+
+def test_otro_host_lo_abre_uvicorn() -> None:
+    assert sockets_de_escucha("127.0.0.1", 0) is None
+
+
+@pytest.mark.skipif(not socket.has_ipv6, reason="sin IPv6 en esta máquina")
+def test_dual_stack_abre_ipv6_e_ipv4() -> None:
+    with socket.socket() as libre:
+        libre.bind(("127.0.0.1", 0))
+        puerto = libre.getsockname()[1]
+    sockets = sockets_de_escucha("::", puerto)
+    assert sockets is not None
+    try:
+        familias = {s.family for s in sockets}
+        assert familias == {socket.AF_INET6, socket.AF_INET}
+        v6 = next(s for s in sockets if s.family == socket.AF_INET6)
+        assert v6.getsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY) == 1
+    finally:
+        for s in sockets:
+            s.close()

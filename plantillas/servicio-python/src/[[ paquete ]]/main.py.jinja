@@ -1,0 +1,63 @@
+"""Arranque con uvicorn.
+
+Por defecto escucha en ``[::]:$PORT`` con dos sockets (IPv6 e IPv4): asyncio
+deja el socket de ``::`` sólo en IPv6 (``IPV6_V6ONLY=1``), y en plataformas
+cuya red privada habla IPv6 pero el healthcheck llega por IPv4 (Railway, por
+ejemplo) el despliegue fallaría con la app sana.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import socket
+
+import uvicorn
+
+from .app import crear_app
+from .config import get_settings
+
+log = logging.getLogger("[[ paquete ]]")
+
+
+def sockets_de_escucha(host: str, port: int) -> list[socket.socket] | None:
+    """Con ``host == "::"`` abre IPv6 e IPv4 en el mismo puerto; si no, ``None``."""
+    if host != "::":
+        return None
+    familias = ((socket.AF_INET6, "::"), (socket.AF_INET, "0.0.0.0"))  # noqa: S104
+    abiertos: list[socket.socket] = []
+    try:
+        for familia, direccion in familias:
+            s = socket.socket(familia, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if familia == socket.AF_INET6:
+                # Sin esto el socket IPv6 tomaría también IPv4 y el bind del
+                # segundo fallaría con "address already in use".
+                s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            s.bind((direccion, port))
+            abiertos.append(s)
+    except OSError:
+        for s in abiertos:
+            s.close()
+        raise
+    return abiertos
+
+
+async def servir() -> int:
+    cfg = get_settings()
+    config = uvicorn.Config(
+        crear_app(), host=cfg.host, port=cfg.port, log_level=cfg.log_level.lower()
+    )
+    sockets = sockets_de_escucha(cfg.host, cfg.port)
+    log.info("escuchando en %s:%s%s", cfg.host, cfg.port, " (IPv6 e IPv4)" if sockets else "")
+    await uvicorn.Server(config).serve(sockets=sockets)
+    return 0
+
+
+def main() -> int:
+    logging.basicConfig(level=get_settings().log_level.upper())
+    return asyncio.run(servir())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

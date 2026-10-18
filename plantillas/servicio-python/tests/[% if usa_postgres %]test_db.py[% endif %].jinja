@@ -1,0 +1,8 @@
+import psycopg
+
+from [[ paquete ]].config import Settings
+
+
+def test_conecta_a_postgres() -> None:
+    with psycopg.connect(Settings().database_url, connect_timeout=5) as conexion:
+        assert conexion.execute("select 1").fetchone() == (1,)

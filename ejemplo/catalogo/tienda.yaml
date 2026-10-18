@@ -1,0 +1,67 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: tienda-web
+  title: Tienda web
+  description: Aplicación principal (catálogo, carrito y pedidos)
+  annotations:
+    github.com/project-slug: ejemplo/tienda
+spec:
+  type: service
+  lifecycle: production
+  owner: group:plataforma
+  system: tienda
+  providesApis: [pedidos-sql]
+  consumesApis: [facturas-http]
+  dependsOn: [resource:db-principal, resource:pasarela-pagos]
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: pedidos-sql
+  title: Tablas de pedidos
+  description: Tablas pedidos_* que otros servicios leen directo por SQL
+  annotations:
+    # Prefijos de tabla: cualquier FROM/JOIN/INSERT INTO pedidos_... cuenta como uso.
+    py-backstage/huellas-sql: pedidos_
+spec:
+  type: sql
+  lifecycle: production
+  owner: group:plataforma
+  system: tienda
+  definition: |
+    pedidos_pedido(id, cliente, total, creado)
+    pedidos_item(id, pedido_id, sku, cantidad, precio)
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: db-principal
+  title: Postgres principal
+  description: Base de datos de la tienda
+  annotations:
+    # DATABASE_URL lo usa todo servicio con Postgres: la huella es lo propio de esta base.
+    py-backstage/huellas: |
+      db-principal\.ejemplo\.test
+      \bTIENDA_DB_URL\b
+spec:
+  type: database
+  owner: group:plataforma
+  system: tienda
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: pasarela-pagos
+  title: Pasarela de pagos
+  description: Proveedor externo de cobro con tarjeta
+  annotations:
+    py-backstage/huellas: |
+      pagos\.ejemplo\.test
+      PAGOS_API_KEY
+    py-backstage/variables: |
+      PAGOS_URL=https://pagos.ejemplo.test
+spec:
+  type: external-service
+  owner: group:plataforma
+  system: tienda

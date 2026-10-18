@@ -1,0 +1,28 @@
+# Descriptor del catálogo (formato Backstage). Lo valida py-backstage en CI.
+# Declarar aquí TODO lo que el servicio usa de otros: si el código usa una API o
+# un recurso que no está en consumesApis/dependsOn, el auditor lo informa (V15).
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: [[ nombre | tojson ]]
+  description: "[[ descripcion | replace('\\', '\\\\') | replace('"', '\\"') ]]"
+  annotations:
+    github.com/project-slug: [[ (org ~ '/' ~ nombre) | tojson ]]
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  lifecycle: experimental
+  owner: [[ dueno | tojson ]]
+  system: [[ sistema | tojson ]]
+[%- if consume_apis %]
+  consumesApis:
+[%- for ref in consume_apis %]
+    - [[ ref | tojson ]]
+[%- endfor %]
+[%- endif %]
+[%- if depende_de %]
+  dependsOn:
+[%- for ref in depende_de %]
+    - [[ ref | tojson ]]
+[%- endfor %]
+[%- endif %]

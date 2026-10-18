@@ -1,0 +1,72 @@
+[project]
+name = "py-backstage"
+version = "0.1.0"
+description = "Catálogo de software con el formato de Backstage, en Python: valida descriptores, audita acoples entre repos, genera el portal con MkDocs y crea servicios nuevos con Copier."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+# El núcleo (validar / auditar / grafo) sólo necesita esto y no escribe nada:
+# sirve con permisos de sólo lectura.
+dependencies = [
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# `py-backstage sitio`
+sitio = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5",
+]
+# `py-backstage nuevo-servicio`
+plantillas = [
+    "copier>=9.4",
+]
+dev = [
+    "py-backstage[sitio,plantillas]",
+    "pytest>=8.3",
+    "mypy>=1.13",
+    "ruff>=0.7",
+    "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+py-backstage = "py_backstage.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/py_backstage"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["plantillas"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["py_backstage", "conftest"]
+
+[tool.ruff.lint.per-file-ignores]
+# Los tests y el módulo de git lanzan `git`/`gh` con argumentos fijos.
+"tests/**" = ["S101", "S603", "S607"]
+"src/py_backstage/repos.py" = ["S603", "S607"]
+"src/py_backstage/descubrir.py" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["copier.*", "mkdocs.*"]
+ignore_missing_imports = true

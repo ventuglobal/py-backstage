@@ -1,0 +1,52 @@
+# Workflow reutilizable: valida el catalog-info.yaml de un repo.
+#
+#   jobs:
+#     catalogo:
+#       uses: ventuglobal/py-backstage/.github/workflows/validar-descriptor.yml@v0.1.0
+#
+# No necesita secretos ni permisos de escritura.
+name: Validar descriptor
+
+on:
+  workflow_call:
+    inputs:
+      archivos:
+        description: Descriptores a validar, separados por espacios o saltos de línea
+        type: string
+        default: catalog-info.yaml
+      version:
+        description: Versión de py-backstage (tag o commit)
+        type: string
+        default: v0.1.0
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: py-backstage validar-descriptor
+        env:
+          ARCHIVOS: ${{ inputs.archivos }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Todo el texto (grep miraría línea por línea) y sin repetirlo en el
+          # mensaje: un salto de línea en la entrada sería un comando del runner.
+          if [[ ! "$VERSION" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::versión inválida (tag, rama o commit)"
+            exit 2
+          fi
+          # Partir por espacios y saltos de línea sin expandir comodines.
+          set -f
+          lista=($ARCHIVOS)
+          set +f
+          if [ "${#lista[@]}" -eq 0 ]; then
+            echo "::error::no hay descriptores que validar"
+            exit 2
+          fi
+          uvx --python 3.12 --from "git+https://github.com/ventuglobal/py-backstage@${VERSION}" \
+            py-backstage validar-descriptor -- "${lista[@]}"

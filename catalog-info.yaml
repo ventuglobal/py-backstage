@@ -1,0 +1,21 @@
+# Descriptor de py-backstage en su propio formato (lo valida el CI).
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: py-backstage
+  title: py-backstage
+  description: >-
+    Catálogo de software con el formato de Backstage, en Python: valida
+    descriptores, audita acoples entre repos, genera el portal y crea
+    servicios nuevos desde una plantilla.
+  annotations:
+    github.com/project-slug: ventuglobal/py-backstage
+  tags: [python, catalogo, backstage]
+  links:
+    - url: https://github.com/ventuglobal/py-backstage
+      title: Repositorio
+spec:
+  type: tool
+  lifecycle: experimental
+  owner: group:mantenedores
+  system: herramientas-desarrollo

@@ -1,0 +1,53 @@
+# [[ nombre ]]
+
+[[ descripcion ]]
+
+- Sistema: `[[ sistema ]]` · Dueño: `[[ dueno ]]`
+- Descriptor del catálogo: [`catalog-info.yaml`](catalog-info.yaml)
+
+## Desarrollo
+
+```bash
+uv sync --extra dev
+uv run pytest
+uv run [[ nombre ]]          # escucha en [::]:8000 (IPv6 e IPv4)
+```
+
+Antes del primer push: `uv lock` y commitear `uv.lock`.
+
+## Acoples
+
+Lo que el servicio usa de otros proyectos se declara en `catalog-info.yaml`
+(`spec.consumesApis` y `spec.dependsOn`). El auditor del catálogo compara esa
+declaración con el código: un uso sin declarar (V15) o una declaración sin uso
+(V17) aparecen como hallazgos.
+[%- if consume_apis or depende_de %]
+
+Declarados al crearlo:
+[% for ref in consume_apis %]
+- consume `[[ ref ]]`
+[%- endfor %]
+[%- for ref in depende_de %]
+- depende de `[[ ref ]]`
+[%- endfor %]
+[%- endif %]
+[%- if variables %]
+
+Variables que traen esas dependencias (ver `.env.example`):
+[% for v in variables %]
+- `[[ v.linea.split('=', 1)[0] ]]` (de `[[ v.fuente ]]`)[% if v.nota is defined %]: comentada en `.env.example`, [[ v.nota ]][% endif %]
+[%- endfor %]
+[%- endif %]
+
+## Despliegue
+
+- Comando: `[[ nombre ]]` (o `python -m [[ paquete ]].main`).
+- Healthcheck: `GET /salud`.
+- Puerto: `PORT` (por defecto 8000); host `::` abre IPv6 e IPv4.
+- Las variables de otros servicios van como referencias de la plataforma
+  (en Railway, `${{servicio.VARIABLE}}`), no con el valor copiado.
+
+## Plantilla
+
+Creado con [py-backstage](https://github.com/ventuglobal/py-backstage).
+Para traer mejoras de la plantilla: `copier update`.

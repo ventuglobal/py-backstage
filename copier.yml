@@ -1,0 +1,128 @@
+# Plantilla de servicio Python acoplado al catálogo (py-backstage nuevo-servicio).
+# Delimitadores [[ ]] y [% %] para no chocar con ${{ }} de GitHub Actions y Railway.
+_subdirectory: plantillas/servicio-python
+_min_copier_version: "9.4"
+_answers_file: .copier-answers.yml
+_envops:
+  block_start_string: "[%"
+  block_end_string: "%]"
+  variable_start_string: "[["
+  variable_end_string: "]]"
+  comment_start_string: "[#"
+  comment_end_string: "#]"
+  keep_trailing_newline: true
+
+nombre:
+  type: str
+  help: Nombre del servicio (minúsculas y guiones; será el repo y el componente)
+  validator: >-
+    [% if not (nombre | regex_search('^[a-z][a-z0-9-]{1,40}[a-z0-9]\\Z')) %]
+    minúsculas, números y guiones; entre 3 y 42 caracteres
+    [% endif %]
+
+descripcion:
+  type: str
+  help: Qué hace el servicio, en una línea
+  validator: >-
+    [% if not descripcion.strip() or (descripcion | regex_search('[\\x00-\\x1f\\x7f]')) %]
+    obligatoria, en una línea y sin caracteres de control
+    [% endif %]
+
+# Paquetes que chocarían con Python (palabras clave y biblioteca estándar) o con
+# lo que instala la plantilla: con la instalación editable gana el otro y
+# `uv run <servicio>` falla. Calculado: no se pregunta ni se guarda.
+nombres_reservados:
+  type: yaml
+  when: false
+  default: [
+    abc, aifc, and, annotated_types, annotationlib, antigravity, anyio, argparse, array, as,
+    assert, ast, async, asyncio, atexit, audioop, await, base64, bdb, binascii, bisect, break,
+    builtins, bz2, calendar, cgi, cgitb, chunk, class, click, cmath, cmd, code, codecs, codeop,
+    collections, colorsys, compileall, compression, concurrent, configparser, contextlib,
+    contextvars, continue, copy, copyreg, crypt, csv, ctypes, curses, dataclasses, datetime,
+    dbm, decimal, def, del, difflib, dis, doctest, dotenv, elif, else, email, encodings,
+    ensurepip, enum, errno, except, fastapi, faulthandler, fcntl, filecmp, fileinput, finally,
+    fnmatch, for, fractions, from, ftplib, functools, gc, genericpath, getopt, getpass, gettext,
+    glob, global, graphlib, grp, gzip, h11, hashlib, hatchling, heapq, hmac, html, http,
+    httpcore, httpx, idlelib, idna, if, imaplib, imghdr, import, importlib, in, iniconfig,
+    inspect, io, ipaddress, is, itertools, json, keyword, lambda, lib2to3, linecache, locale,
+    logging, lzma, mailbox, mailcap, marshal, math, mimetypes, mmap, modulefinder, msilib,
+    msvcrt, multiprocessing, mypy, mypy_extensions, netrc, nis, nntplib, nonlocal, not, nt,
+    ntpath, nturl2path, numbers, opcode, operator, optparse, or, os, ossaudiodev, packaging,
+    pass, pathlib, pathspec, pdb, pickle, pickletools, pipes, pkgutil, platform, plistlib,
+    pluggy, poplib, posix, posixpath, pprint, profile, pstats, psycopg, psycopg_binary,
+    psycopg_pool, pty, pwd, py_compile, pyclbr, pydantic, pydantic_core, pydantic_settings,
+    pydoc, pydoc_data, pyexpat, pytest, queue, quopri, raise, random, re, readline, reprlib,
+    resource, return, rlcompleter, ruff, runpy, sched, secrets, select, selectors, shelve,
+    shlex, shutil, signal, site, smtplib, sndhdr, sniffio, socket, socketserver, spwd, sqlite3,
+    sre_compile, sre_constants, sre_parse, ssl, starlette, stat, statistics, string, stringprep,
+    struct, subprocess, sunau, symtable, sys, sysconfig, syslog, tabnanny, tarfile, telnetlib,
+    tempfile, termios, textwrap, this, threading, time, timeit, tkinter, token, tokenize,
+    tomllib, trace, traceback, tracemalloc, try, tty, turtle, turtledemo, types, typing,
+    typing_extensions, typing_inspection, unicodedata, unittest, urllib, uu, uuid, uvicorn,
+    venv, warnings, wave, weakref, webbrowser, while, winreg, winsound, with, wsgiref, xdrlib,
+    xml, xmlrpc, yield, zipapp, zipfile, zipimport, zlib, zoneinfo
+  ]
+
+paquete:
+  type: str
+  help: Paquete Python
+  default: "[[ nombre | replace('-', '_') ]]"
+  validator: >-
+    [% if not (paquete | regex_search('^[a-z][a-z0-9_]*\\Z')) %]identificador Python en minúsculas[% elif paquete in nombres_reservados %]choca con un módulo de Python o de las dependencias de la plantilla: elegir otro[% endif %]
+
+sistema:
+  type: str
+  help: Sistema del catálogo al que pertenece (system:<nombre>)
+  validator: >-
+    [% if not (sistema | regex_search('^(?:(?i:system):)?(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?/)?[a-zA-Z0-9](?:[-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9])?\\Z')) %]referencia a un sistema inválida[% endif %]
+
+dueno:
+  type: str
+  help: Dueño en el catálogo (group:<nombre> o user:<nombre>)
+  default: group:default/equipo
+  validator: >-
+    [% if not (dueno | regex_search('^(?:(?i:group|user):)?(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?/)?[a-zA-Z0-9](?:[-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9])?\\Z')) %]referencia a un grupo o usuario inválida[% endif %]
+
+org:
+  type: str
+  help: Organización de GitHub
+  validator: >-
+    [% if not (org | regex_search('^[A-Za-z0-9][A-Za-z0-9-]{0,38}\\Z')) %]organización inválida[% endif %]
+
+depende_de:
+  type: yaml
+  help: Recursos o componentes de los que depende (lista YAML; 'resource:x' o 'component:x')
+  default: []
+  validator: >-
+    [% if depende_de is string or depende_de is mapping or depende_de is not iterable %]lista YAML de referencias[% else %][% for r in depende_de %][% if r is not string or not (r | regex_search('^(?i:resource|component):(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?/)?[a-zA-Z0-9](?:[-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9])?\\Z')) %]referencia inválida (con el tipo, resource: o component:): [[ r ]][% endif %][% endfor %][% endif %]
+
+consume_apis:
+  type: yaml
+  help: APIs que consume (lista YAML de referencias)
+  default: []
+  validator: >-
+    [% if consume_apis is string or consume_apis is mapping or consume_apis is not iterable %]lista YAML de referencias[% else %][% for r in consume_apis %][% if r is not string or not (r | regex_search('^(?:(?i:api):)?(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?/)?[a-zA-Z0-9](?:[-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9])?\\Z')) %]referencia inválida: [[ r ]][% endif %][% endfor %][% endif %]
+
+variables:
+  type: yaml
+  help: Variables que traen las dependencias ({linea, fuente, nota}; las arma nuevo-servicio)
+  default: []
+  validator: >-
+    [% if variables is string or variables is mapping or variables is not iterable %]lista YAML[% else %][% for v in variables %][% if v is not mapping or v.linea is not string or not (v.linea | regex_search('^[A-Z][A-Z0-9_]*=[^\\x00-\\x1f\\x7f]*\\Z')) or v.fuente is not string or not (v.fuente | regex_search('^[a-zA-Z]+:(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?/)?[a-zA-Z0-9](?:[-_.a-zA-Z0-9]{0,61}[a-zA-Z0-9])?\\Z')) or (v.nota is defined and (v.nota is not string or (v.nota | regex_search('[\\x00-\\x1f\\x7f]')))) %]variable inválida[% endif %][% endfor %][% endif %]
+
+usa_postgres:
+  type: bool
+  help: ¿Usa Postgres? (agrega psycopg, el test de conexión y el servicio en CI)
+  default: false
+
+validar_descriptor_en_ci:
+  type: bool
+  help: ¿Validar catalog-info.yaml en CI con el workflow reutilizable de py-backstage?
+  default: true
+
+_exclude:
+  - "copier.yml"
+  - "~*"
+  - "*.py[co]"
+  - "__pycache__"

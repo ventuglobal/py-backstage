@@ -1,0 +1,11 @@
+# Configuración del catálogo de ejemplo (organización ficticia).
+org: ejemplo
+raiz_clones: ~/code
+repos:
+  - slug: ejemplo/tienda
+    rama: main
+  - slug: ejemplo/facturador
+    rama: main
+  - slug: ejemplo/prototipo-2019
+    ignorar: true
+    motivo: archivado de hecho; no corre en producción

@@ -1,0 +1,85 @@
+# CI del servicio: lint, tests (falla si alguno se salta) y descriptor del catálogo.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --extra dev
+      - name: ruff
+        run: |
+          uv run ruff check . --output-format=github
+          uv run ruff format --check .
+      - name: mypy (no bloquea)
+        continue-on-error: true
+        run: uv run mypy src
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+[%- if usa_postgres %]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: [[ paquete ]]
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/[[ paquete ]]
+[%- endif %]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --extra dev
+      - name: pytest
+        run: uv run pytest -q -rs --junitxml=pytest.xml
+      - name: Ningún test saltado
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          raiz = ET.parse("pytest.xml").getroot()
+          suites = [raiz] if raiz.tag == "testsuite" else list(raiz.iter("testsuite"))
+          saltados = sum(int(s.get("skipped", 0)) for s in suites)
+          print(f"{sum(int(s.get('tests', 0)) for s in suites)} tests, {saltados} saltados")
+          if saltados:
+              raise SystemExit(f"::error::{saltados} tests saltados")
+          PY
+[%- if validar_descriptor_en_ci %]
+
+  catalogo:
+    uses: ventuglobal/py-backstage/.github/workflows/validar-descriptor.yml@v0.1.0
+[%- endif %]

@@ -1,0 +1,140 @@
+# CI de py-backstage: lint, tipos, pruebas, el portal de ejemplo y la plantilla
+# renderizada en sus dos variantes (con y sin Postgres), corriendo su propio CI.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --extra dev
+      - name: ruff
+        run: |
+          uv run ruff check . --output-format=github
+          uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy src tests
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --extra dev
+      - name: pytest
+        run: uv run pytest -q -rs --junitxml=pytest.xml
+      - name: Ningún test saltado
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          raiz = ET.parse("pytest.xml").getroot()
+          suites = [raiz] if raiz.tag == "testsuite" else list(raiz.iter("testsuite"))
+          saltados = sum(int(s.get("skipped", 0)) for s in suites)
+          print(f"{sum(int(s.get('tests', 0)) for s in suites)} tests, {saltados} saltados")
+          if saltados:
+              raise SystemExit(f"::error::{saltados} tests saltados")
+          PY
+
+  ejemplo:
+    name: catálogo de ejemplo y portal
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --extra dev
+      - name: validar (sin repos clonados)
+        run: uv run py-backstage validar --catalogo ejemplo/catalogo --sin-repos
+      - name: descriptor propio
+        run: uv run py-backstage validar-descriptor catalog-info.yaml
+      - name: portal (mkdocs --strict)
+        run: |
+          uv run py-backstage sitio --catalogo ejemplo/catalogo --salida "$RUNNER_TEMP/sitio" \
+            --titulo "Catálogo de ejemplo"
+          uv run mkdocs build --strict -f "$RUNNER_TEMP/sitio/mkdocs.yml"
+
+  plantilla:
+    name: plantilla (${{ matrix.variante }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        variante: [simple, postgres]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cotizador
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: uv sync --extra dev
+      - name: Renderizar
+        env:
+          VARIANTE: ${{ matrix.variante }}
+        run: |
+          extra=()
+          if [ "$VARIANTE" = postgres ]; then extra+=(--postgres); fi
+          uv run py-backstage nuevo-servicio "$RUNNER_TEMP/cotizador" \
+            --catalogo ejemplo/catalogo --plantilla local \
+            --nombre cotizador --descripcion "Servicio de prueba" \
+            --sistema tienda --dueno group:plataforma \
+            --depende-de api:facturas-http "${extra[@]}"
+          uv run py-backstage validar-descriptor "$RUNNER_TEMP/cotizador/catalog-info.yaml"
+      - name: CI del servicio generado
+        working-directory: ${{ runner.temp }}/cotizador
+        env:
+          VARIANTE: ${{ matrix.variante }}
+        run: |
+          if [ "$VARIANTE" = postgres ]; then
+            export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cotizador
+          fi
+          uv sync --extra dev
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy src
+          uv run pytest -q -rs
+          # El servicio no trae MkDocs como dependencia: se usa el de py-backstage.
+          "$GITHUB_WORKSPACE/.venv/bin/mkdocs" build --strict -d "$RUNNER_TEMP/sitio-servicio"

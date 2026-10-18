@@ -1,0 +1,36 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: plataforma
+  description: Equipo que mantiene la tienda y la facturación
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: comercio
+  description: Venta en línea de punta a punta
+spec:
+  owner: group:plataforma
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: tienda
+  title: Tienda
+  description: Catálogo, pedidos y cobro
+spec:
+  owner: group:plataforma
+  domain: comercio
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: facturacion
+  title: Facturación
+  description: Emisión de documentos tributarios
+spec:
+  owner: group:plataforma
+  domain: comercio
